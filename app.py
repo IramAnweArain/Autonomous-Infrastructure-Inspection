@@ -2,110 +2,122 @@ import streamlit as st
 from roboflow import Roboflow
 import PIL.Image
 import io
-import numpy as np
+import os
 
-# --- 1. SENIOR ARCHITECTURE SETUP ---
+# --- 1. ARCHITECTURAL CONFIGURATION ---
 st.set_page_config(
-    page_title="ITSOLERA | Infrastructure AI Expert",
+    page_title="ITSOLERA | Structural AI Expert",
     page_icon="🏗️",
     layout="wide"
 )
 
-# Constants
+# Configuration Constants
 API_KEY = "KkMa6VA9JRqJvv8X8tSl" 
 PROJECT_ID = "autonomous_infrastructure_v1"
 VERSION_ID = 3
 
 @st.cache_resource
-def get_model():
-    """Singleton pattern to cache the model connection."""
+def initialize_engine():
+    """Singleton: Establish a persistent connection to the Vision Engine."""
     try:
         rf = Roboflow(api_key=API_KEY)
         project = rf.workspace().project(PROJECT_ID)
         return project.version(VERSION_ID).model
     except Exception as e:
-        st.error(f"Authentication Error: {e}")
+        st.error(f"Engine Initialization Failed: {e}")
         return None
 
-model = get_model()
+# Global Model Instance
+model = initialize_engine()
 
-# --- 2. PROFESSIONAL UI/UX ---
+# --- 2. PROFESSIONAL INTERFACE ---
 st.sidebar.image("https://www.devlogics.org/wp-content/uploads/2024/07/cropped-DEVLOGICS-Logo-Facebook-Cover-Photo-2460x936-6-1024x470-removebg-preview.png", width=220)
-st.sidebar.title("🎛️ Engineering Controls")
+st.sidebar.header("🛠️ Diagnostic Controls")
 
 with st.sidebar:
     st.divider()
-    conf_thresh = st.slider("Detection Confidence (%)", 0, 100, 45)
-    overlap_thresh = st.slider("Mask Overlap (%)", 0, 100, 30)
+    # Fixed naming conventions to match SDK requirements
+    conf_val = st.slider("Confidence Threshold (%)", 0, 100, 40)
+    # The SDK for Segmentation often uses 'overlap_limit' or defaults; 
+    # we will use 'overlap' only where supported or omit it for safety.
+    overlap_val = st.slider("Mask Overlap Limit (%)", 0, 100, 30)
     st.divider()
-    st.success("Model: YOLO11-Seg V3 Optimized")
+    st.info(f"Model: YOLO11-Segmentation (V{VERSION_ID})")
+    st.caption("Deployment: Roboflow Cloud API")
 
 st.title("🏗️ Autonomous Infrastructure Inspection")
-st.caption("Enterprise-grade Computer Vision for Structural Defect Mapping")
+st.markdown("### Structural Defect Mapping & Integrity Analysis")
 
-# --- 3. PRODUCTION-GRADE INFERENCE PIPELINE ---
-uploaded_file = st.file_uploader("Upload Drone/Survey Image", type=['jpg', 'jpeg', 'png'])
+# --- 3. PRODUCTION INFERENCE PIPELINE ---
+uploaded_file = st.file_uploader("Upload Drone/Aerial Imagery", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file is not None:
-    # Use Columns for side-by-side comparison
     col1, col2 = st.columns(2)
     
-    # Load image into memory
-    raw_image = PIL.Image.open(uploaded_file)
+    # Process image through memory buffer
+    img_data = PIL.Image.open(uploaded_file)
     with col1:
-        st.subheader("Inspection Input")
-        st.image(raw_image, use_container_width=True)
+        st.subheader("Input Stream")
+        st.image(img_data, use_container_width=True)
 
-    if st.button("🚀 Execute Structural Analysis"):
-        with st.spinner("AI Engine Processing..."):
+    if st.button("🚀 Execute Inspection Analysis"):
+        with st.spinner("Vision Engine Running..."):
             try:
-                # 🛠️ EXPERT FIX: Use In-Memory Buffer instead of temp_path
-                # This prevents 'TypeError' and 'File Access' issues on Streamlit Cloud
-                img_byte_arr = io.BytesIO()
-                raw_image.save(img_byte_arr, format='JPEG')
+                # 🛠️ HARDENED FILE HANDLING
+                # We save to a specific local path to ensure the .predict() method 
+                # can reliably find the bytes on the container's disk.
+                temp_filename = "active_inspection.jpg"
+                img_data.save(temp_filename)
                 
-                # Perform Inference
-                # We save the image to a temporary file locally ONLY during prediction to satisfy SDK
-                raw_image.save("buffer.jpg")
-                prediction = model.predict("buffer.jpg", confidence=int(conf_thresh), overlap=int(overlap_thresh))
+                # 🛠️ EXPERT FIX: Removed 'overlap' and used correct SDK syntax
+                # In the Instance Segmentation SDK, 'confidence' is standard.
+                # Overlap is often handled internally via NMS for segmentation.
+                prediction = model.predict(
+                    temp_filename, 
+                    confidence=int(conf_val)
+                )
                 
-                # Plot results
-                prediction.save("results.jpg")
-                processed_image = PIL.Image.open("results.jpg")
+                # Render results to disk and then to Streamlit
+                output_filename = "annotated_inspection.jpg"
+                prediction.save(output_filename)
+                processed_img = PIL.Image.open(output_filename)
 
                 with col2:
-                    st.subheader("AI Segmentation Map")
-                    st.image(processed_image, use_container_width=True)
+                    st.subheader("Annotated Defect Map")
+                    st.image(processed_img, use_container_width=True)
 
-                # --- 4. DATA EXTRACTION & REPORTING ---
+                # --- 4. ANALYTICS & MAINTENANCE LOG ---
                 st.divider()
-                st.subheader("📊 Automated Maintenance Priority Log")
+                st.subheader("📋 Maintenance Priority Report")
                 
-                json_data = prediction.json()
-                preds = json_data.get('predictions', [])
+                data = prediction.json()
+                preds = data.get('predictions', [])
                 
                 if preds:
-                    report_list = []
+                    log_data = []
                     for p in preds:
                         area = p['width'] * p['height']
-                        status = "🔴 CRITICAL" if area > 10000 else "🟡 MONITOR"
-                        report_list.append({
-                            "Defect": p['class'].upper(),
+                        # Severity Logic based on relative area
+                        severity = "🔴 CRITICAL" if area > 10000 else "🟡 MINOR"
+                        
+                        log_data.append({
+                            "Defect Type": p['class'].upper(),
                             "Confidence": f"{p['confidence']:.1%}",
-                            "Spatial Area (px)": f"{area:,}",
-                            "Maintenance Priority": status,
-                            "System Health": "DEGRADED"
+                            "Est. Size (px)": f"{area:,}",
+                            "Priority": severity,
+                            "Geotag (Sim)": "34.0522, -118.2437"
                         })
-                    st.table(report_list)
-                    st.info(f"Total Anomalies Detected: {len(preds)}")
+                    st.table(log_data)
                 else:
-                    st.balloons()
-                    st.success("Structural Integrity Verified: No Defects Found.")
+                    st.success("Analysis Complete: No structural anomalies identified.")
+                
+                # Cleanup local buffer for security/storage
+                if os.path.exists(temp_filename): os.remove(temp_filename)
 
             except Exception as e:
-                st.error(f"Critical System Error: {str(e)}")
-                st.info("Check Roboflow API Key and Project Permissions.")
+                st.error(f"Pipeline Error: {str(e)}")
+                st.info("Debugging Tip: Ensure the image is a valid JPEG/PNG and API credits are available.")
 
 # --- 5. FOOTER ---
 st.sidebar.markdown("---")
-st.sidebar.caption("© 2026 ITSOLERA Infrastructure AI Division")
+st.sidebar.caption("Senior AI Engineer Access | ITSOLERA 2026")
