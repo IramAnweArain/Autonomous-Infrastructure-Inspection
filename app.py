@@ -5,9 +5,9 @@ import cv2
 import tempfile
 import os
 import time
+import io
 
-# --- 1. INDUSTRIAL THEME CONFIGURATION ---
-# Neutral color palette to avoid Light/Dark mode UI clashing
+# --- 1. INDUSTRIAL THEME & HIGH-CONTRAST CSS ---
 st.set_page_config(
     page_title="Infrastructure Intelligence System",
     layout="wide"
@@ -15,25 +15,39 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Force Industrial Neutral Colors */
-    .stApp { background-color: #f4f7f9; }
+    /* Global Background */
+    .stApp { background-color: #0e1117; color: #e0e0e0; }
+    
+    /* Sidebar Styling */
     [data-testid="stSidebar"] { 
-        background-color: #1a202c; 
-        color: #ffffff;
-        border-right: 1px solid #2d3748;
+        background-color: #161b22; 
+        border-right: 1px solid #30363d;
     }
-    h1, h2, h3 { color: #1a202c !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    
+    /* HIGH-CONTRAST TABLE FIX */
+    /* This forces the table to be dark with light text regardless of mode */
+    .stTable { 
+        background-color: #161b22 !important; 
+        color: #f0f6fc !important; 
+        border: 1px solid #30363d !important;
+    }
+    th { background-color: #0d1117 !important; color: #58a6ff !important; text-transform: uppercase; }
+    td { border-bottom: 1px solid #30363d !important; color: #f0f6fc !important; }
+
+    /* Button Styling */
     .stButton>button { 
-        background-color: #2b6cb0; 
+        background-color: #238636; 
         color: white; 
-        border-radius: 2px; 
-        width: 100%;
-        border: none;
+        border-radius: 6px; 
+        border: 1px solid rgba(240,246,242,0.1);
         font-weight: 600;
+        transition: 0.3s;
     }
-    .stTable { background-color: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    /* Metric styling */
-    [data-testid="stMetricValue"] { color: #2b6cb0 !important; font-weight: bold; }
+    .stButton>button:hover { background-color: #2ea043; border-color: #8b949e; }
+
+    /* Metric Card Styling */
+    [data-testid="stMetricValue"] { color: #58a6ff !important; font-family: monospace; }
+    [data-testid="stMetricLabel"] { color: #8b949e !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,31 +69,26 @@ model = load_vision_engine()
 
 # --- 2. NAVIGATION HUB ---
 with st.sidebar:
-    st.title("SYSTEM CONTROL")
+    st.header("SYSTEM CONTROL")
     st.write("---")
-    inspect_mode = st.selectbox("INSPECTION TARGET", ["Static Frame Analysis", "Dynamic Video Stream"])
+    inspect_mode = st.selectbox("INSPECTION TARGET", ["STATIC FRAME ANALYSIS", "DYNAMIC VIDEO STREAM"])
     st.write("---")
-    
-    # Precision Controls
     conf_level = st.slider("DETECTION SENSITIVITY (%)", 0, 100, 45)
     
-    # Sampling Control for Speed
     st.write("VIDEO OPTIMIZATION")
     sampling_rate = st.select_slider(
-        "PROCESSING FREQUENCY",
+        "SAMPLING FREQUENCY",
         options=[1, 5, 15, 30, 60],
-        value=15,
-        help="Higher values increase speed by skipping frames."
+        value=15
     )
-    
     st.write("---")
-    st.caption("ITSOLERA ENGINEERING DIVISION | 2026")
+    st.caption("ITSOLERA ENGINEERING v3.2")
 
 # --- 3. CORE ANALYTICS ENGINE ---
 st.title("AUTONOMOUS INFRASTRUCTURE INSPECTION")
-st.write("SYSTEM STATUS: ONLINE | CORE: YOLO11-SEGMENTATION")
+st.write("CORE STATUS: ACTIVE | ENGINE: YOLO11-SEGMENTATION")
 
-if inspect_mode == "Static Frame Analysis":
+if inspect_mode == "STATIC FRAME ANALYSIS":
     file = st.file_uploader("UPLOAD SOURCE IMAGE", type=['jpg', 'jpeg', 'png'])
     
     if file:
@@ -91,8 +100,12 @@ if inspect_mode == "Static Frame Analysis":
             st.image(input_img, use_container_width=True)
 
         if st.button("EXECUTE ANALYSIS"):
-            with st.spinner("PROCESSING..."):
+            with st.spinner("RUNNING INFERENCE..."):
+                # Save to memory buffer for stability
+                buf = io.BytesIO()
+                input_img.save(buf, format="JPEG")
                 input_img.save("static_buffer.jpg")
+                
                 prediction = model.predict("static_buffer.jpg", confidence=int(conf_level))
                 prediction.save("static_result.jpg")
                 
@@ -100,7 +113,6 @@ if inspect_mode == "Static Frame Analysis":
                     st.write("ANOMALY MAPPING")
                     st.image("static_result.jpg", use_container_width=True)
 
-                # Formal Reporting
                 st.write("---")
                 st.subheader("MAINTENANCE LOG")
                 preds = prediction.json().get('predictions', [])
@@ -110,16 +122,16 @@ if inspect_mode == "Static Frame Analysis":
                         size = p['width'] * p['height']
                         prio = "URGENT" if size > 12000 else "MONITOR"
                         log.append({
-                            "CLASSIFICATION": p['class'].upper(),
-                            "CONFIDENCE": f"{p['confidence']:.2%}",
-                            "SPATIAL AREA": f"{size:,} px",
-                            "MAINTENANCE PRIORITY": prio
+                            "TYPE": p['class'].upper(),
+                            "CONFIDENCE": f"{p['confidence']:.1%}",
+                            "AREA (PX)": f"{size:,}",
+                            "PRIORITY": prio
                         })
-                    st.table(log)
+                    st.table(log) # This table is now high-contrast via CSS
                 else:
-                    st.success("NO STRUCTURAL DEFECTS IDENTIFIED.")
+                    st.info("NO ANOMALIES IDENTIFIED.")
 
-elif inspect_mode == "Dynamic Video Stream":
+elif inspect_mode == "DYNAMIC VIDEO STREAM":
     video_file = st.file_uploader("UPLOAD DRONE FOOTAGE", type=['mp4', 'avi', 'mov'])
     
     if video_file:
@@ -129,10 +141,9 @@ elif inspect_mode == "Dynamic Video Stream":
         cap = cv2.VideoCapture(tfile.name)
         display_handle = st.empty()
         
-        # Real-time Telemetry
         kpi1, kpi2, kpi3 = st.columns(3)
         total_defects = kpi1.metric("DEFECTS FOUND", "0")
-        processed_frames = kpi2.metric("PROCESSED FRAMES", "0")
+        processed_frames = kpi2.metric("FRAMES PROCESSED", "0")
         latency_metric = kpi3.metric("ENGINE LATENCY", "0ms")
 
         if st.button("START STREAM INSPECTION"):
@@ -143,24 +154,20 @@ elif inspect_mode == "Dynamic Video Stream":
                 ret, frame = cap.read()
                 if not ret: break
                 
-                # Logic to skip frames based on sampling rate for speed
                 if frame_ptr % sampling_rate == 0:
                     start_time = time.time()
-                    
-                    # Convert BGR to RGB for PIL
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     cv2.imwrite("video_buffer.jpg", frame)
                     
                     prediction = model.predict("video_buffer.jpg", confidence=int(conf_level))
                     prediction.save("video_out.jpg")
                     
-                    # Update Metrics
+                    # Telemetry Update
                     current_batch = len(prediction.json().get('predictions', []))
                     found_count += current_batch
                     end_time = time.time()
                     
                     # Refresh UI
-                    display_handle.image("video_out.jpg", caption=f"FRAME ID: {frame_ptr}", use_container_width=True)
+                    display_handle.image("video_out.jpg", caption=f"ANALYZING FRAME: {frame_ptr}", use_container_width=True)
                     total_defects.metric("DEFECTS FOUND", str(found_count))
                     processed_frames.metric("PROCESSED FRAMES", str(frame_ptr))
                     latency_metric.metric("ENGINE LATENCY", f"{int((end_time - start_time)*1000)}ms")
@@ -170,6 +177,5 @@ elif inspect_mode == "Dynamic Video Stream":
             cap.release()
             st.success("STREAM ANALYSIS FINALIZED.")
 
-# --- 4. DATA INTEGRITY FOOTER ---
 st.write("---")
-st.caption("CONFIDENTIAL: INTERNAL INSPECTION USE ONLY | ITSOLERA CORE v3.1")
+st.caption("ITSOLERA INFRASTRUCTURE OS | CORE v3.2 | NOVELTY-INTEGRATION READY")
