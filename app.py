@@ -64,7 +64,8 @@ if uploaded_file:
             image.save(temp_path)
             
             # Request Prediction from Roboflow Cloud
-            prediction = model.predict(temp_path, confidence=conf_thresh, overlap=overlap_thresh)
+            # We force the numbers to be integers to prevent the TypeError
+            prediction = model.predict(temp_path, confidence=int(conf_thresh), overlap=int(overlap_thresh))
             
             # Save and Show Result
             output_path = "output_analysis.jpg"
