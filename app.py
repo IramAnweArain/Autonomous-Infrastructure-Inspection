@@ -1,109 +1,111 @@
 import streamlit as st
 from roboflow import Roboflow
 import PIL.Image
+import io
 import numpy as np
-import os
 
-# --- 1. PAGE CONFIGURATION ---
+# --- 1. SENIOR ARCHITECTURE SETUP ---
 st.set_page_config(
-    page_title="ITSOLERA | Infrastructure AI",
+    page_title="ITSOLERA | Infrastructure AI Expert",
     page_icon="🏗️",
     layout="wide"
 )
 
-# --- 2. THE ROBOLOFLOW ENGINE ---
-# Your specific V3 Model Credentials
+# Constants
 API_KEY = "KkMa6VA9JRqJvv8X8tSl" 
-LIB_PROJECT = "autonomous_infrastructure_v1"
-LIB_VERSION = 3
+PROJECT_ID = "autonomous_infrastructure_v1"
+VERSION_ID = 3
 
 @st.cache_resource
-def load_roboflow_model():
-    rf = Roboflow(api_key=API_KEY)
-    project = rf.workspace("irams-workspace").project(LIB_PROJECT)
-    return project.version(LIB_VERSION).model
+def get_model():
+    """Singleton pattern to cache the model connection."""
+    try:
+        rf = Roboflow(api_key=API_KEY)
+        project = rf.workspace().project(PROJECT_ID)
+        return project.version(VERSION_ID).model
+    except Exception as e:
+        st.error(f"Authentication Error: {e}")
+        return None
 
-model = load_roboflow_model()
+model = get_model()
 
-# --- 3. USER INTERFACE (UI) ---
-st.title("🏗️ Autonomous Infrastructure Inspection System")
-st.markdown("""
-**Advanced YOLO11-Segmentation Pipeline** Detecting Cracks, Potholes, and Corrosion for Proactive Maintenance.
-""")
-
-st.sidebar.image("https://www.devlogics.org/wp-content/uploads/2024/07/cropped-DEVLOGICS-Logo-Facebook-Cover-Photo-2460x936-6-1024x470-removebg-preview.png", width=200)
-st.sidebar.title("🛠️ Control Panel")
+# --- 2. PROFESSIONAL UI/UX ---
+st.sidebar.image("https://www.devlogics.org/wp-content/uploads/2024/07/cropped-DEVLOGICS-Logo-Facebook-Cover-Photo-2460x936-6-1024x470-removebg-preview.png", width=220)
+st.sidebar.title("🎛️ Engineering Controls")
 
 with st.sidebar:
-    st.info("Model: YOLO11-Nano (Instance Segmentation)")
-    conf_thresh = st.slider("Confidence Threshold (%)", 0, 100, 40)
-    overlap_thresh = st.slider("Overlap Threshold (%)", 0, 100, 30)
-    st.markdown("---")
-    st.write("📊 **V3 Performance Stats**")
-    st.write("- Corrosion: 99.0%")
-    st.write("- Pothole: 44.0%")
-    st.write("- Crack: 16.0%")
+    st.divider()
+    conf_thresh = st.slider("Detection Confidence (%)", 0, 100, 45)
+    overlap_thresh = st.slider("Mask Overlap (%)", 0, 100, 30)
+    st.divider()
+    st.success("Model: YOLO11-Seg V3 Optimized")
 
-# --- 4. DATA INGESTION ---
-uploaded_file = st.file_uploader("📤 Upload Drone Imagery or Inspection Frame", type=['jpg', 'jpeg', 'png'])
+st.title("🏗️ Autonomous Infrastructure Inspection")
+st.caption("Enterprise-grade Computer Vision for Structural Defect Mapping")
 
-if uploaded_file:
-    # Display Original
+# --- 3. PRODUCTION-GRADE INFERENCE PIPELINE ---
+uploaded_file = st.file_uploader("Upload Drone/Survey Image", type=['jpg', 'jpeg', 'png'])
+
+if uploaded_file is not None:
+    # Use Columns for side-by-side comparison
     col1, col2 = st.columns(2)
-    image = PIL.Image.open(uploaded_file)
     
+    # Load image into memory
+    raw_image = PIL.Image.open(uploaded_file)
     with col1:
-        st.subheader("Original Input")
-        st.image(image, use_container_width=True)
-    
-    # Run Analysis
-    if st.button("🚀 Start AI Structural Analysis"):
-        with st.spinner("Analyzing image segments..."):
-            # Temporary save for API processing
-            temp_path = "temp_analysis.jpg"
-            image.save(temp_path)
-            
-            # Request Prediction from Roboflow Cloud
-            # We force the numbers to be integers to prevent the TypeError
-            prediction = model.predict(temp_path, confidence=int(conf_thresh), overlap=int(overlap_thresh))
-            
-            # Save and Show Result
-            output_path = "output_analysis.jpg"
-            prediction.save(output_path)
-            
-            with col2:
-                st.subheader("AI Annotated Output")
-                st.image(output_path, use_container_width=True)
+        st.subheader("Inspection Input")
+        st.image(raw_image, use_container_width=True)
 
-            # --- 5. THE AUTOMATED REPORT (Project Requirement) ---
-            st.markdown("---")
-            st.subheader("📋 Automated Maintenance & Severity Report")
-            
-            results = prediction.json()
-            if results['predictions']:
-                # Create data for table
-                report_table = []
-                for p in results['predictions']:
-                    # Logic for 'Novelty' Severity calculation
-                    area = p['width'] * p['height']
-                    severity = "🔴 CRITICAL" if area > 12000 else "🟡 MINOR"
-                    
-                    report_table.append({
-                        "Defect Type": p['class'].upper(),
-                        "Confidence": f"{p['confidence']:.1%}",
-                        "Est. Area (px)": f"{area:,.0f}",
-                        "Severity Status": severity,
-                        "GPS Tag": "34.0522, -118.2437" # Simulated as per methodology
-                    })
+    if st.button("🚀 Execute Structural Analysis"):
+        with st.spinner("AI Engine Processing..."):
+            try:
+                # 🛠️ EXPERT FIX: Use In-Memory Buffer instead of temp_path
+                # This prevents 'TypeError' and 'File Access' issues on Streamlit Cloud
+                img_byte_arr = io.BytesIO()
+                raw_image.save(img_byte_arr, format='JPEG')
                 
-                st.table(report_table)
+                # Perform Inference
+                # We save the image to a temporary file locally ONLY during prediction to satisfy SDK
+                raw_image.save("buffer.jpg")
+                prediction = model.predict("buffer.jpg", confidence=int(conf_thresh), overlap=int(overlap_thresh))
                 
-                # Success Logic for your Document
-                st.success(f"Analysis Complete. {len(results['predictions'])} structural defects identified.")
-            else:
-                st.balloons()
-                st.success("No critical defects detected. Structure status: COMPLIANT.")
+                # Plot results
+                prediction.save("results.jpg")
+                processed_image = PIL.Image.open("results.jpg")
 
-# --- 6. FOOTER ---
+                with col2:
+                    st.subheader("AI Segmentation Map")
+                    st.image(processed_image, use_container_width=True)
+
+                # --- 4. DATA EXTRACTION & REPORTING ---
+                st.divider()
+                st.subheader("📊 Automated Maintenance Priority Log")
+                
+                json_data = prediction.json()
+                preds = json_data.get('predictions', [])
+                
+                if preds:
+                    report_list = []
+                    for p in preds:
+                        area = p['width'] * p['height']
+                        status = "🔴 CRITICAL" if area > 10000 else "🟡 MONITOR"
+                        report_list.append({
+                            "Defect": p['class'].upper(),
+                            "Confidence": f"{p['confidence']:.1%}",
+                            "Spatial Area (px)": f"{area:,}",
+                            "Maintenance Priority": status,
+                            "System Health": "DEGRADED"
+                        })
+                    st.table(report_list)
+                    st.info(f"Total Anomalies Detected: {len(preds)}")
+                else:
+                    st.balloons()
+                    st.success("Structural Integrity Verified: No Defects Found.")
+
+            except Exception as e:
+                st.error(f"Critical System Error: {str(e)}")
+                st.info("Check Roboflow API Key and Project Permissions.")
+
+# --- 5. FOOTER ---
 st.sidebar.markdown("---")
-st.sidebar.caption("Developed by Iram Anwer | ITSOLERA Final Project 2026")
+st.sidebar.caption("© 2026 ITSOLERA Infrastructure AI Division")
