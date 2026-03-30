@@ -6,20 +6,34 @@ import tempfile
 import os
 import time
 
-# --- 1. ENTERPRISE UI CONFIGURATION ---
+# --- 1. INDUSTRIAL THEME CONFIGURATION ---
+# Neutral color palette to avoid Light/Dark mode UI clashing
 st.set_page_config(
-    page_title="ITSOLERA | Autonomous Infrastructure Inspection",
-    page_icon="🏗️",
+    page_title="Infrastructure Intelligence System",
     layout="wide"
 )
 
-# Custom CSS for Professional Industry Look
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .stSidebar { background-color: #1e293b; color: white; }
-    div[data-testid="stExpander"] { border: none; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    /* Force Industrial Neutral Colors */
+    .stApp { background-color: #f4f7f9; }
+    [data-testid="stSidebar"] { 
+        background-color: #1a202c; 
+        color: #ffffff;
+        border-right: 1px solid #2d3748;
+    }
+    h1, h2, h3 { color: #1a202c !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .stButton>button { 
+        background-color: #2b6cb0; 
+        color: white; 
+        border-radius: 2px; 
+        width: 100%;
+        border: none;
+        font-weight: 600;
+    }
+    .stTable { background-color: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    /* Metric styling */
+    [data-testid="stMetricValue"] { color: #2b6cb0 !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -29,126 +43,133 @@ PROJECT_ID = "autonomous_infrastructure_v1"
 VERSION_ID = 3
 
 @st.cache_resource
-def init_vision_engine():
+def load_vision_engine():
     try:
         rf = Roboflow(api_key=API_KEY)
         project = rf.workspace().project(PROJECT_ID)
         return project.version(VERSION_ID).model
-    except Exception as e:
-        st.error(f"Critical System Initialization Failure: {e}")
+    except Exception:
         return None
 
-model = init_vision_engine()
+model = load_vision_engine()
 
-# --- 2. SIDEBAR & KPI DASHBOARD ---
+# --- 2. NAVIGATION HUB ---
 with st.sidebar:
-    st.title("🛡️ Inspection Hub")
-    st.caption("ITSOLERA Infrastructure AI Division")
-    st.divider()
+    st.title("SYSTEM CONTROL")
+    st.write("---")
+    inspect_mode = st.selectbox("INSPECTION TARGET", ["Static Frame Analysis", "Dynamic Video Stream"])
+    st.write("---")
     
-    # Application Mode Selector
-    app_mode = st.radio("Select Input Source", ["Static Imagery", "Drone Video Feed"])
+    # Precision Controls
+    conf_level = st.slider("DETECTION SENSITIVITY (%)", 0, 100, 45)
     
-    st.divider()
-    conf_thresh = st.slider("Confidence Threshold (%)", 0, 100, 40)
-    st.info(f"YOLO11-Segmentation Core Active\nProcessing Latency: Optimized")
+    # Sampling Control for Speed
+    st.write("VIDEO OPTIMIZATION")
+    sampling_rate = st.select_slider(
+        "PROCESSING FREQUENCY",
+        options=[1, 5, 15, 30, 60],
+        value=15,
+        help="Higher values increase speed by skipping frames."
+    )
+    
+    st.write("---")
+    st.caption("ITSOLERA ENGINEERING DIVISION | 2026")
 
-# --- 3. MAIN INTERFACE LOGIC ---
-st.title("🏗️ Autonomous Infrastructure Inspection")
-st.markdown("##### Enterprise Computer Vision Pipeline for Structural Health Monitoring")
+# --- 3. CORE ANALYTICS ENGINE ---
+st.title("AUTONOMOUS INFRASTRUCTURE INSPECTION")
+st.write("SYSTEM STATUS: ONLINE | CORE: YOLO11-SEGMENTATION")
 
-if app_mode == "Static Imagery":
-    uploaded_img = st.file_uploader("Upload Inspection Image", type=['jpg', 'jpeg', 'png'])
+if inspect_mode == "Static Frame Analysis":
+    file = st.file_uploader("UPLOAD SOURCE IMAGE", type=['jpg', 'jpeg', 'png'])
     
-    if uploaded_img:
-        col1, col2 = st.columns(2)
-        raw_img = PIL.Image.open(uploaded_img)
+    if file:
+        col_in, col_out = st.columns(2)
+        input_img = PIL.Image.open(file)
         
-        with col1:
-            st.subheader("Inspection Input")
-            st.image(raw_img, use_container_width=True)
+        with col_in:
+            st.write("INPUT STREAM")
+            st.image(input_img, use_container_width=True)
 
-        if st.button("🚀 Run Deep Analysis"):
-            with st.spinner("AI Engine In-Progress..."):
-                raw_img.save("buffer.jpg")
-                prediction = model.predict("buffer.jpg", confidence=int(conf_thresh))
-                prediction.save("results.jpg")
+        if st.button("EXECUTE ANALYSIS"):
+            with st.spinner("PROCESSING..."):
+                input_img.save("static_buffer.jpg")
+                prediction = model.predict("static_buffer.jpg", confidence=int(conf_level))
+                prediction.save("static_result.jpg")
                 
-                with col2:
-                    st.subheader("Annotated Defect Map")
-                    st.image("results.jpg", use_container_width=True)
+                with col_out:
+                    st.write("ANOMALY MAPPING")
+                    st.image("static_result.jpg", use_container_width=True)
 
-                # Report Generation
-                st.divider()
-                st.subheader("📋 Structural Integrity Report")
-                data = prediction.json()
-                preds = data.get('predictions', [])
-                
+                # Formal Reporting
+                st.write("---")
+                st.subheader("MAINTENANCE LOG")
+                preds = prediction.json().get('predictions', [])
                 if preds:
-                    report = []
+                    log = []
                     for p in preds:
-                        area = p['width'] * p['height']
-                        status = "🔴 CRITICAL" if area > 10000 else "🟡 MONITOR"
-                        report.append({
-                            "Defect Type": p['class'].upper(),
-                            "Confidence": f"{p['confidence']:.1%}",
-                            "Area (Pixels)": f"{area:,}",
-                            "Priority": status
+                        size = p['width'] * p['height']
+                        prio = "URGENT" if size > 12000 else "MONITOR"
+                        log.append({
+                            "CLASSIFICATION": p['class'].upper(),
+                            "CONFIDENCE": f"{p['confidence']:.2%}",
+                            "SPATIAL AREA": f"{size:,} px",
+                            "MAINTENANCE PRIORITY": prio
                         })
-                    st.table(report)
+                    st.table(log)
                 else:
-                    st.success("Verification Complete: No Anomalies Detected.")
+                    st.success("NO STRUCTURAL DEFECTS IDENTIFIED.")
 
-elif app_mode == "Drone Video Feed":
-    uploaded_video = st.file_uploader("Upload Drone Flight Footage", type=['mp4', 'avi', 'mov'])
+elif inspect_mode == "Dynamic Video Stream":
+    video_file = st.file_uploader("UPLOAD DRONE FOOTAGE", type=['mp4', 'avi', 'mov'])
     
-    if uploaded_video:
+    if video_file:
         tfile = tempfile.NamedTemporaryFile(delete=False)
-        tfile.write(uploaded_video.read())
+        tfile.write(video_file.read())
         
-        vid_cap = cv2.VideoCapture(tfile.name)
-        st_frame = st.empty()
-        st_progress = st.progress(0)
+        cap = cv2.VideoCapture(tfile.name)
+        display_handle = st.empty()
         
-        # Real-time Metrics
-        m1, m2, m3 = st.columns(3)
-        issue_count = m1.metric("Anomalies Found", "0")
-        frame_metric = m2.metric("Frames Processed", "0")
-        status_metric = m3.metric("System Status", "Scanning")
+        # Real-time Telemetry
+        kpi1, kpi2, kpi3 = st.columns(3)
+        total_defects = kpi1.metric("DEFECTS FOUND", "0")
+        processed_frames = kpi2.metric("PROCESSED FRAMES", "0")
+        latency_metric = kpi3.metric("ENGINE LATENCY", "0ms")
 
-        total_frames = int(vid_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        defect_found_total = 0
-        frame_idx = 0
-
-        if st.button("🛰️ Process Video Stream"):
-            while vid_cap.isOpened():
-                ret, frame = vid_cap.read()
+        if st.button("START STREAM INSPECTION"):
+            found_count = 0
+            frame_ptr = 0
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
                 if not ret: break
                 
-                # Inference every 15 frames for speed and balance (Industry Standard)
-                if frame_idx % 15 == 0:
-                    cv2.imwrite("frame_buffer.jpg", frame)
-                    prediction = model.predict("frame_buffer.jpg", confidence=int(conf_thresh))
-                    prediction.save("frame_result.jpg")
+                # Logic to skip frames based on sampling rate for speed
+                if frame_ptr % sampling_rate == 0:
+                    start_time = time.time()
                     
-                    # Update metrics
-                    current_preds = len(prediction.json().get('predictions', []))
-                    defect_found_total += current_preds
+                    # Convert BGR to RGB for PIL
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite("video_buffer.jpg", frame)
                     
-                    # Display Result
-                    res_img = PIL.Image.open("frame_result.jpg")
-                    st_frame.image(res_img, caption=f"Analyzing Frame {frame_idx}/{total_frames}", use_container_width=True)
+                    prediction = model.predict("video_buffer.jpg", confidence=int(conf_level))
+                    prediction.save("video_out.jpg")
                     
-                    issue_count.metric("Anomalies Found", str(defect_found_total))
-                    frame_metric.metric("Frames Processed", str(frame_idx))
+                    # Update Metrics
+                    current_batch = len(prediction.json().get('predictions', []))
+                    found_count += current_batch
+                    end_time = time.time()
+                    
+                    # Refresh UI
+                    display_handle.image("video_out.jpg", caption=f"FRAME ID: {frame_ptr}", use_container_width=True)
+                    total_defects.metric("DEFECTS FOUND", str(found_count))
+                    processed_frames.metric("PROCESSED FRAMES", str(frame_ptr))
+                    latency_metric.metric("ENGINE LATENCY", f"{int((end_time - start_time)*1000)}ms")
 
-                frame_idx += 1
-                st_progress.progress(frame_idx / total_frames)
+                frame_ptr += 1
             
-            vid_cap.release()
-            status_metric.metric("System Status", "Inspection Complete", delta="Ready")
-            st.success(f"Video Analysis Complete. Final Report generated for {defect_found_total} total anomalies.")
+            cap.release()
+            st.success("STREAM ANALYSIS FINALIZED.")
 
-# --- 4. FOOTER ---
-st.divider()
-st.caption("ITSOLERA Final Project | Senior AI/ML Engineering Division | © 2026")
+# --- 4. DATA INTEGRITY FOOTER ---
+st.write("---")
+st.caption("CONFIDENTIAL: INTERNAL INSPECTION USE ONLY | ITSOLERA CORE v3.1")
