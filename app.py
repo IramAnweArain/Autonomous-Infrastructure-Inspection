@@ -1,123 +1,154 @@
 import streamlit as st
 from roboflow import Roboflow
 import PIL.Image
-import io
+import cv2
+import tempfile
 import os
+import time
 
-# --- 1. ARCHITECTURAL CONFIGURATION ---
+# --- 1. ENTERPRISE UI CONFIGURATION ---
 st.set_page_config(
-    page_title="ITSOLERA | Structural AI Expert",
+    page_title="ITSOLERA | Autonomous Infrastructure Inspection",
     page_icon="🏗️",
     layout="wide"
 )
 
-# Configuration Constants
-API_KEY = "KkMa6VA9JRqJvv8X8tSl" 
+# Custom CSS for Professional Industry Look
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .stSidebar { background-color: #1e293b; color: white; }
+    div[data-testid="stExpander"] { border: none; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
+
+# API Constants
+API_KEY = "KkMa6VA9JRqJvv8X8tSl"
 PROJECT_ID = "autonomous_infrastructure_v1"
 VERSION_ID = 3
 
 @st.cache_resource
-def initialize_engine():
-    """Singleton: Establish a persistent connection to the Vision Engine."""
+def init_vision_engine():
     try:
         rf = Roboflow(api_key=API_KEY)
         project = rf.workspace().project(PROJECT_ID)
         return project.version(VERSION_ID).model
     except Exception as e:
-        st.error(f"Engine Initialization Failed: {e}")
+        st.error(f"Critical System Initialization Failure: {e}")
         return None
 
-# Global Model Instance
-model = initialize_engine()
+model = init_vision_engine()
 
-# --- 2. PROFESSIONAL INTERFACE ---
-st.sidebar.image("https://www.devlogics.org/wp-content/uploads/2024/07/cropped-DEVLOGICS-Logo-Facebook-Cover-Photo-2460x936-6-1024x470-removebg-preview.png", width=220)
-st.sidebar.header("🛠️ Diagnostic Controls")
-
+# --- 2. SIDEBAR & KPI DASHBOARD ---
 with st.sidebar:
+    st.title("🛡️ Inspection Hub")
+    st.caption("ITSOLERA Infrastructure AI Division")
     st.divider()
-    # Fixed naming conventions to match SDK requirements
-    conf_val = st.slider("Confidence Threshold (%)", 0, 100, 40)
-    # The SDK for Segmentation often uses 'overlap_limit' or defaults; 
-    # we will use 'overlap' only where supported or omit it for safety.
-    overlap_val = st.slider("Mask Overlap Limit (%)", 0, 100, 30)
-    st.divider()
-    st.info(f"Model: YOLO11-Segmentation (V{VERSION_ID})")
-    st.caption("Deployment: Roboflow Cloud API")
-
-st.title("🏗️ Autonomous Infrastructure Inspection")
-st.markdown("### Structural Defect Mapping & Integrity Analysis")
-
-# --- 3. PRODUCTION INFERENCE PIPELINE ---
-uploaded_file = st.file_uploader("Upload Drone/Aerial Imagery", type=['jpg', 'jpeg', 'png'])
-
-if uploaded_file is not None:
-    col1, col2 = st.columns(2)
     
-    # Process image through memory buffer
-    img_data = PIL.Image.open(uploaded_file)
-    with col1:
-        st.subheader("Input Stream")
-        st.image(img_data, use_container_width=True)
+    # Application Mode Selector
+    app_mode = st.radio("Select Input Source", ["Static Imagery", "Drone Video Feed"])
+    
+    st.divider()
+    conf_thresh = st.slider("Confidence Threshold (%)", 0, 100, 40)
+    st.info(f"YOLO11-Segmentation Core Active\nProcessing Latency: Optimized")
 
-    if st.button("🚀 Execute Inspection Analysis"):
-        with st.spinner("Vision Engine Running..."):
-            try:
-                # 🛠️ HARDENED FILE HANDLING
-                # We save to a specific local path to ensure the .predict() method 
-                # can reliably find the bytes on the container's disk.
-                temp_filename = "active_inspection.jpg"
-                img_data.save(temp_filename)
-                
-                # 🛠️ EXPERT FIX: Removed 'overlap' and used correct SDK syntax
-                # In the Instance Segmentation SDK, 'confidence' is standard.
-                # Overlap is often handled internally via NMS for segmentation.
-                prediction = model.predict(
-                    temp_filename, 
-                    confidence=int(conf_val)
-                )
-                
-                # Render results to disk and then to Streamlit
-                output_filename = "annotated_inspection.jpg"
-                prediction.save(output_filename)
-                processed_img = PIL.Image.open(output_filename)
+# --- 3. MAIN INTERFACE LOGIC ---
+st.title("🏗️ Autonomous Infrastructure Inspection")
+st.markdown("##### Enterprise Computer Vision Pipeline for Structural Health Monitoring")
 
+if app_mode == "Static Imagery":
+    uploaded_img = st.file_uploader("Upload Inspection Image", type=['jpg', 'jpeg', 'png'])
+    
+    if uploaded_img:
+        col1, col2 = st.columns(2)
+        raw_img = PIL.Image.open(uploaded_img)
+        
+        with col1:
+            st.subheader("Inspection Input")
+            st.image(raw_img, use_container_width=True)
+
+        if st.button("🚀 Run Deep Analysis"):
+            with st.spinner("AI Engine In-Progress..."):
+                raw_img.save("buffer.jpg")
+                prediction = model.predict("buffer.jpg", confidence=int(conf_thresh))
+                prediction.save("results.jpg")
+                
                 with col2:
                     st.subheader("Annotated Defect Map")
-                    st.image(processed_img, use_container_width=True)
+                    st.image("results.jpg", use_container_width=True)
 
-                # --- 4. ANALYTICS & MAINTENANCE LOG ---
+                # Report Generation
                 st.divider()
-                st.subheader("📋 Maintenance Priority Report")
-                
+                st.subheader("📋 Structural Integrity Report")
                 data = prediction.json()
                 preds = data.get('predictions', [])
                 
                 if preds:
-                    log_data = []
+                    report = []
                     for p in preds:
                         area = p['width'] * p['height']
-                        # Severity Logic based on relative area
-                        severity = "🔴 CRITICAL" if area > 10000 else "🟡 MINOR"
-                        
-                        log_data.append({
+                        status = "🔴 CRITICAL" if area > 10000 else "🟡 MONITOR"
+                        report.append({
                             "Defect Type": p['class'].upper(),
                             "Confidence": f"{p['confidence']:.1%}",
-                            "Est. Size (px)": f"{area:,}",
-                            "Priority": severity,
-                            "Geotag (Sim)": "34.0522, -118.2437"
+                            "Area (Pixels)": f"{area:,}",
+                            "Priority": status
                         })
-                    st.table(log_data)
+                    st.table(report)
                 else:
-                    st.success("Analysis Complete: No structural anomalies identified.")
+                    st.success("Verification Complete: No Anomalies Detected.")
+
+elif app_mode == "Drone Video Feed":
+    uploaded_video = st.file_uploader("Upload Drone Flight Footage", type=['mp4', 'avi', 'mov'])
+    
+    if uploaded_video:
+        tfile = tempfile.NamedTemporaryFile(delete=False)
+        tfile.write(uploaded_video.read())
+        
+        vid_cap = cv2.VideoCapture(tfile.name)
+        st_frame = st.empty()
+        st_progress = st.progress(0)
+        
+        # Real-time Metrics
+        m1, m2, m3 = st.columns(3)
+        issue_count = m1.metric("Anomalies Found", "0")
+        frame_metric = m2.metric("Frames Processed", "0")
+        status_metric = m3.metric("System Status", "Scanning")
+
+        total_frames = int(vid_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        defect_found_total = 0
+        frame_idx = 0
+
+        if st.button("🛰️ Process Video Stream"):
+            while vid_cap.isOpened():
+                ret, frame = vid_cap.read()
+                if not ret: break
                 
-                # Cleanup local buffer for security/storage
-                if os.path.exists(temp_filename): os.remove(temp_filename)
+                # Inference every 15 frames for speed and balance (Industry Standard)
+                if frame_idx % 15 == 0:
+                    cv2.imwrite("frame_buffer.jpg", frame)
+                    prediction = model.predict("frame_buffer.jpg", confidence=int(conf_thresh))
+                    prediction.save("frame_result.jpg")
+                    
+                    # Update metrics
+                    current_preds = len(prediction.json().get('predictions', []))
+                    defect_found_total += current_preds
+                    
+                    # Display Result
+                    res_img = PIL.Image.open("frame_result.jpg")
+                    st_frame.image(res_img, caption=f"Analyzing Frame {frame_idx}/{total_frames}", use_container_width=True)
+                    
+                    issue_count.metric("Anomalies Found", str(defect_found_total))
+                    frame_metric.metric("Frames Processed", str(frame_idx))
 
-            except Exception as e:
-                st.error(f"Pipeline Error: {str(e)}")
-                st.info("Debugging Tip: Ensure the image is a valid JPEG/PNG and API credits are available.")
+                frame_idx += 1
+                st_progress.progress(frame_idx / total_frames)
+            
+            vid_cap.release()
+            status_metric.metric("System Status", "Inspection Complete", delta="Ready")
+            st.success(f"Video Analysis Complete. Final Report generated for {defect_found_total} total anomalies.")
 
-# --- 5. FOOTER ---
-st.sidebar.markdown("---")
-st.sidebar.caption("Senior AI Engineer Access | ITSOLERA 2026")
+# --- 4. FOOTER ---
+st.divider()
+st.caption("ITSOLERA Final Project | Senior AI/ML Engineering Division | © 2026")
