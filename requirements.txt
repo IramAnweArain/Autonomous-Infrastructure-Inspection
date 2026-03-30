@@ -2,3 +2,4 @@ streamlit
 roboflow
 Pillow
 numpy
+opencv-python-headless
